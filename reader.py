@@ -1,8 +1,12 @@
 #!/usr/bin/env python
 
+import logging
 import serial
 import sys
 import time
+
+
+logger = logging.getLogger(__name__)
 
 
 class TimeTempHumidity(object):
@@ -12,7 +16,7 @@ class TimeTempHumidity(object):
         # [temp C, % humid, ...]
         self.tempHumids = tempHumids
 
-def decCtoF(decC):
+def degCtoF(degC):
     return (degC * 1.8) + 32
 
 class Reader(object):
@@ -39,7 +43,7 @@ class Reader(object):
                 continue
             now = time.time()
             try:
-                parts = map(lambda x: x.strip(), line.split('\t'))
+                parts = list(map(lambda x: x.strip(), line.split(b'\t')))
                 tempHumids = []
                 while len(parts) >= 2:
                     tempHumids.append(float(parts.pop(0))) # degC
@@ -50,7 +54,7 @@ class Reader(object):
                     self.recentData = self.recentData[-self.recentLimit:]
                 self.notifyListeners(newRecord)
             except Exception as e:
-                sys.stderr.write('err reading and parsing: {}\n'.format(e))
+                logger.error('err reading and parsing: %s', e, exc_info=True)
                 #sys.stdout.write('{}\t\t\t\t\tbad read\n'.format(timestr))
                 pass
 
