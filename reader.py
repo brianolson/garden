@@ -3,6 +3,7 @@
 import logging
 import serial
 import sys
+import threading
 import time
 
 
@@ -15,6 +16,25 @@ class TimeTempHumidity(object):
         self.when = when
         # [temp C, % humid, ...]
         self.tempHumids = tempHumids
+
+    def degC(self):
+        sumC = 0.0
+        count = 0
+        for i in range(0, len(self.tempHumids), 2):
+            sumC += self.tempHumids[i]
+            count += 1
+        return sumC / count
+
+    def degF(self):
+        return degCtoF(self.degC())
+
+    def pctHumid(self):
+        sumH = 0.0
+        count = 0
+        for i in range(0, len(self.tempHumids), 2):
+            sumH += self.tempHumids[i + 1]
+            count += 1
+        return sumH / count
 
 def degCtoF(degC):
     return (degC * 1.8) + 32
@@ -29,6 +49,8 @@ class Reader(object):
         # each entry is TimeTempHumidity
         self.recentData = []
         self.recentLimit = 100
+
+        self.lock = threading.Lock()
 
     def run(self):
         ser = serial.Serial(sys.argv[1], 115200, timeout=0.5)
@@ -49,16 +71,27 @@ class Reader(object):
                     tempHumids.append(float(parts.pop(0))) # degC
                     tempHumids.append(float(parts.pop(0))) # % humid
                 newRecord = TimeTempHumidity(now, tempHumids)
-                self.recentData.append(newRecord)
-                if len(self.recentData) > self.recentLimit:
-                    self.recentData = self.recentData[-self.recentLimit:]
-                self.notifyListeners(newRecord)
+                with self.lock:
+                    self.recentData.append(newRecord)
+                    if len(self.recentData) > self.recentLimit:
+                        self.recentData = self.recentData[-self.recentLimit:]
+                    self._notifyListeners(newRecord)
             except Exception as e:
                 logger.error('err reading and parsing: %s', e, exc_info=True)
                 #sys.stdout.write('{}\t\t\t\t\tbad read\n'.format(timestr))
                 pass
 
-    def notifyListeners(self, record):
+    def addListener(self, lister):
+        with self.lock:
+            self.listeners.append(lister)
+
+    def getLatest(self):
+        with self.lock:
+            if not self.recentData:
+                return None
+            return self.recentData[0]
+
+    def _notifyListeners(self, record):
         for lister in self.listeners:
             lister(self, record)
 
@@ -77,7 +110,7 @@ def main():
         sys.stderr.write("usage:\n\treader.py /dev/cu.{port}\n")
         sys.exit(1)
     reader = Reader(sys.argv[1])
-    reader.listeners.append(printListener)
+    reader.addListener(printListener)
     reader.run()
 
 def _old_main():
