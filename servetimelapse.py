@@ -64,9 +64,9 @@ class GardenServer(object):
         if path == '/latest' or path == '/latest/' or path == '/current' or path == '/current/':
             return serveLatestImage(environ, start_response)
 
-        return self.serveList(environ, start_response)
+        return self.serveList(environ, start_response, limit=50)
 
-    def serveList(self, environ, start_response):
+    def serveList(self, environ, start_response, limit=None):
         start_response('200 OK', [('Content-type', 'text/html; charset=utf-8')])
         yield b'''<!DOCTYPE html>
 <html>
@@ -78,10 +78,15 @@ class GardenServer(object):
 '''
         timeTempHumid = self.tempHumid.getLatest()
         if timeTempHumid is not None:
-            yield ('<div>{} °C {} °F {}% humidity</div>\n'.format(timeTempHumid.degC(), timeTempHumid.degF(), timeTempHumid.pctHumid())).encode('utf8')
+            yield ('<div>{:0.1f} °C {:0.1f} °F {:0.1f}% humidity</div>\n'.format(timeTempHumid.degC(), timeTempHumid.degF(), timeTempHumid.pctHumid())).encode('utf8')
         yield b'<div><a href="/current">current</a></div><div><img src="/current" width="480" height="270" /></div>\n'
+        count = 0
         for imgPath in sorted(filter(lambda x: x.endswith('.jpg'), os.listdir(timelapseRootPath)), reverse=True):
+            count += 1
             yield ('<div><a href="/i/{fname}">{fname}</a></div>\n'.format(fname=imgPath)).encode('utf8')
+            if (limit is not None) and (count > limit):
+                yield b'<div><a href="/list/" style="font-size: 130%">...</a></div>\n'
+                break
         yield b'</body></html>\n'
 
 
