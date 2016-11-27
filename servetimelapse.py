@@ -4,6 +4,7 @@
 # raspistill -tl 30000 -n -dt -o /mnt/usb128/timelapse/i%d.jpg -t 0 -w 1920 -h 1080 -vf -hf
 
 import glob
+import json
 import os
 import sys
 import threading
@@ -64,7 +65,19 @@ class GardenServer(object):
         if path == '/latest' or path == '/latest/' or path == '/current' or path == '/current/':
             return serveLatestImage(environ, start_response)
 
+        if path == '/th.js':
+            return self.serveTempHumid(environ, start_response)
+
         return self.serveList(environ, start_response, limit=50)
+
+    def serveTempHumid(self, environ, start_response):
+        start_response('200 OK', [('Content-type', 'application/json; charset=utf-8')])
+        timeTempHumid = self.tempHumid.getLatest()
+        out = {}
+        if timeTempHumid is not None:
+            out['timestamp'] = timeTempHumid.when
+            out['tempHumids'] = timeTempHumid.tempHumids
+        yield json.dumps(out).encode('utf8')
 
     def serveList(self, environ, start_response, limit=None):
         start_response('200 OK', [('Content-type', 'text/html; charset=utf-8')])
