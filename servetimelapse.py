@@ -88,6 +88,9 @@ class GardenServer(object):
         if path == '/th.js':
             return self.serveTempHumid(environ, start_response)
 
+        if path == '/thall.js':
+            return self.serveAllTempHumid(environ, start_response)
+
         if path == '/grab.jpg':
             return self.serveImmediate(environ, start_response)
 
@@ -95,12 +98,17 @@ class GardenServer(object):
         return self.serveImmediateHome(environ, start_response)
 
     def serveTempHumid(self, environ, start_response):
-        start_response('200 OK', [('Content-type', 'application/json; charset=utf-8'), PAGE_CACHE_HEADER])
         timeTempHumid = self.tempHumid.getLatest()
         out = {}
         if timeTempHumid is not None:
             out['timestamp'] = timeTempHumid.when
             out['tempHumids'] = timeTempHumid.tempHumids
+        start_response('200 OK', [('Content-type', 'application/json; charset=utf-8'), PAGE_CACHE_HEADER])
+        yield json.dumps(out).encode('utf8')
+
+    def serveAllTempHumid(self, environ, start_response):
+        out = [{'timestamp':x.when, 'tempHumids':x.tempHumids} for x in self.tempHumid.recentData]
+        start_response('200 OK', [('Content-type', 'application/json; charset=utf-8'), PAGE_CACHE_HEADER])
         yield json.dumps(out).encode('utf8')
 
     def serveImmediateHome(self, environ, start_response):

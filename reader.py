@@ -48,7 +48,7 @@ class Reader(object):
         self.listeners = []
         # each entry is TimeTempHumidity
         self.recentData = []
-        self.recentLimit = 100
+        self.recentLimit = 1000
 
         self.lock = threading.Lock()
 
