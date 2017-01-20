@@ -53,14 +53,36 @@ def serveLatestImage(environ, start_response):
     return serveImage(environ, start_response, imgPath, noCache=True)
 
 
-def imageNowFromSubprocess():
-    cmd = ['raspistill', '-o', '-', '-t', '10', '-vf', '-hf', '-w', '1920', '-h', '1080', '-n']
+def imageNowFromSubprocess(flip=False):
+    cmd = ['raspistill', '-o', '-', '-t', '10', '-w', '1920', '-h', '1080', '-n']
+    if flip:
+        cmd += ['-vf', '-hf']
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE)
     pout, perr = proc.communicate(timeout=23)
     if proc.returncode != 0:
         sys.stderr.write('return code {} from subprocess {:r}\n'.format(proc.returncode, cmd))
         raise Exception("raspistill failed")
     return pout
+
+
+RASPISTILL_LONG_ARGS = [
+    'sharpness', # -100 to 100
+    'contrast', # -100 to 100
+    'brightness', # 0 to 100
+    'saturation', # -100 to 100
+    'ISO',
+    'ev', # steps of 1/6 stop
+    'exposure', # off,auto,night,nightpreview,backlight,spotlight,sports,snow,beach,verylong,fixedfps,antishake,fireworks
+    'awb', # Auto White Balance modes: off,auto,sun,cloud,shade,tungsten,fluorescent,incandescent,flash,horizon
+    'imxfx', # none,negative,solarise,sketch,denoise,emboss,oilpaint,hatch,gpen,pastel,watercolour,film,blur,saturation,colourswap,washedout,posterise,colourpoint,colourbalance,cartoon
+    'metering', # average,spot,backlit,matrix
+    'hflip',
+    'vflip',
+    'roi', # region of interest (focus, levels); (x,y,w,d) each 0.0-1.0
+    'shutter', # microseconds
+    'drc', # Dynamic Range Compression (DRC) options: off,low,med,high
+    'stats', # Force recomputation of statistics on stills capture pass
+]
 
 # for the image
 CACHE_SECONDS = 7
@@ -151,6 +173,8 @@ class GardenServer(object):
         yield b'</body></html>\n'
 
     def serveImmediate(self, environ, start_response):
+        # TODO: pass through filtered set of cgi args to `raspistill`
+        # @see RASPISTILL_LONG_ARGS above
         data = None
         now = time.time()
         if self.imageCache is not None:
